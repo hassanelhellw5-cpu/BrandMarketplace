@@ -1,0 +1,157 @@
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 500;
+  background: rgba(0, 0, 0, 0.92);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: callFadeIn 0.2s ease;
+}
+@keyframes callFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.call-panel {
+  position: relative;
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.call-remote-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  background: #111;
+}
+
+.call-pip {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  width: 160px;
+  height: 220px;
+  border-radius: 16px;
+  overflow: hidden;
+  border: 2px solid rgba(255, 255, 255, 0.25);
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.5);
+  z-index: 10;
+  animation: pipIn 0.25s ease;
+}
+@keyframes pipIn { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+
+.call-pip video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+
+.call-avatar-area {
+  position: relative;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+
+.call-avatar {
+  width: 120px;
+  height: 120px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 42px;
+  font-weight: 800;
+  animation: avatarPulse 2s ease-in-out infinite;
+}
+@keyframes avatarPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(139, 92, 246, 0.4); }
+  50% { box-shadow: 0 0 0 20px rgba(139, 92, 246, 0); }
+}
+
+.call-info {
+  position: relative;
+  z-index: 5;
+  text-align: center;
+  margin-bottom: 50px;
+}
+
+.call-name {
+  color: #fff;
+  font-size: 26px;
+  font-weight: 700;
+  margin-bottom: 6px;
+}
+
+.call-status {
+  color: rgba(255, 255, 255, 0.65);
+  font-size: 15px;
+  font-weight: 500;
+  letter-spacing: 0.3px;
+}
+
+.call-controls {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  padding: 20px;
+  background: rgba(0, 0, 0, 0.35);
+  backdrop-filter: blur(12px);
+  border-radius: 30px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.call-ctrl {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.call-ctrl:hover { background: rgba(255, 255, 255, 0.28); transform: scale(1.06); }
+
+.call-accept {
+  background: #10b981;
+  width: 64px;
+  height: 64px;
+  animation: ringPulse 1.5s ease-in-out infinite;
+}
+.call-accept:hover { background: #059669; }
+@keyframes ringPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+}
+
+.call-decline {
+  background: #ef4444;
+}
+.call-decline:hover { background: #dc2626; }
+
+@media (max-width: 768px) {
+  .call-pip {
+    width: 110px;
+    height: 150px;
+    top: 16px;
+    right: 16px;
+  }
+  .call-avatar { width: 90px; height: 90px; font-size: 32px; }
+  .call-name { font-size: 22px; }
+  .call-ctrl { width: 50px; height: 50px; }
+  .call-accept { width: 58px; height: 58px; }
+}

@@ -1,0 +1,15 @@
+.roster-avatar-img {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--primary);
+  flex-shrink: 0;
+}
+.roster-avatar-fallback {
+  width: 52px; height: 52px;
+  border-radius: 50%;
+  background: var(--grad);
+  display: grid; place-items: center;
+  color: #fff;
+  flex-shrink: 0;
+}

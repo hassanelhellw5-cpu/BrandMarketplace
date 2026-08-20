@@ -1,0 +1,267 @@
+/* ---- Portfolio Page — Jaeger Zechar inspired ---- */
+
+.pf-hero {
+  position: relative;
+  width: 100%;
+  min-height: 70vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 80px 24px 50px;
+  overflow: hidden;
+}
+.pf-hero::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    radial-gradient(50% 50% at 30% 20%, rgba(139,92,246,0.12), transparent 60%),
+    radial-gradient(40% 40% at 70% 80%, rgba(236,72,153,0.10), transparent 60%);
+  pointer-events: none;
+}
+.pf-hero-avatar {
+  width: 110px;
+  height: 110px;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 3px solid rgba(139,92,246,0.4);
+  margin-bottom: 20px;
+  box-shadow: 0 0 40px rgba(139,92,246,0.2);
+}
+.pf-hero-name {
+  font-size: clamp(32px, 5vw, 52px);
+  font-family: var(--font-head);
+  font-weight: 700;
+  letter-spacing: -0.03em;
+  line-height: 1.1;
+  margin-bottom: 8px;
+}
+.pf-hero-subtitle {
+  font-size: 16px;
+  color: var(--text-dim);
+  max-width: 500px;
+  margin-bottom: 6px;
+}
+.pf-hero-stats {
+  display: flex;
+  gap: 28px;
+  margin-top: 18px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.pf-hero-stats span {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.pf-hero-divider {
+  width: 60px;
+  height: 2px;
+  background: var(--grad);
+  border-radius: 999px;
+  margin: 28px auto 0;
+}
+
+/* ---- Category tabs ---- */
+.pf-cats {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 0 24px;
+  margin-bottom: 32px;
+}
+.pf-cat {
+  padding: 8px 20px;
+  border-radius: 999px;
+  font-size: 13px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: transparent;
+  color: var(--text-dim);
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pf-cat:hover { border-color: var(--primary); color: var(--text); }
+.pf-cat.active {
+  background: var(--grad);
+  border-color: transparent;
+  color: #fff;
+  font-weight: 600;
+}
+
+/* ---- Masonry gallery ---- */
+.pf-gallery {
+  columns: 3;
+  column-gap: 16px;
+  padding: 0 24px;
+  max-width: 1200px;
+  margin: 0 auto;
+}
+.pf-item {
+  break-inside: avoid;
+  margin-bottom: 16px;
+  border-radius: 14px;
+  overflow: hidden;
+  position: relative;
+  cursor: pointer;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  transition: all 0.3s;
+}
+.pf-item:hover {
+  border-color: rgba(139,92,246,0.4);
+  transform: translateY(-3px);
+  box-shadow: var(--shadow);
+}
+.pf-item img,
+.pf-item video {
+  width: 100%;
+  display: block;
+  transition: transform 0.4s;
+}
+.pf-item:hover img { transform: scale(1.04); }
+.pf-item-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(transparent 50%, rgba(0,0,0,0.7));
+  opacity: 0;
+  transition: opacity 0.3s;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  padding: 16px;
+}
+.pf-item:hover .pf-item-overlay { opacity: 1; }
+.pf-item-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #fff;
+  margin-bottom: 4px;
+}
+.pf-item-meta {
+  font-size: 12px;
+  color: rgba(255,255,255,0.7);
+  display: flex;
+  gap: 12px;
+}
+.pf-item-meta span {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.pf-item-badge {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  background: rgba(8,8,13,0.7);
+  backdrop-filter: blur(8px);
+  border: 1px solid var(--border);
+  color: #fff;
+}
+
+/* ---- Full-screen lightbox ---- */
+.pf-lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(0,0,0,0.95);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  backdrop-filter: blur(20px);
+}
+.pf-lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  z-index: 10;
+}
+.pf-lightbox-close:hover { background: rgba(255,255,255,0.15); }
+.pf-lightbox-content {
+  max-width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.pf-lightbox-content img,
+.pf-lightbox-content video {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 12px;
+  object-fit: contain;
+}
+.pf-lightbox-info {
+  margin-top: 16px;
+  text-align: center;
+  color: var(--text-dim);
+  font-size: 14px;
+}
+.pf-lightbox-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: 1px solid rgba(255,255,255,0.15);
+  background: rgba(255,255,255,0.08);
+  color: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.pf-lightbox-nav:hover { background: rgba(255,255,255,0.15); }
+.pf-lightbox-nav.prev { left: 20px; }
+.pf-lightbox-nav.next { right: 20px; }
+.pf-lightbox-counter {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: rgba(255,255,255,0.5);
+  font-size: 13px;
+  font-family: var(--font-mono);
+}
+
+/* ---- Portfolio detail modal ---- */
+.pf-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+}
+.pf-detail-grid img,
+.pf-detail-grid video {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: 12px;
+}
+
+/* ---- Responsive ---- */
+@media (max-width: 900px) {
+  .pf-gallery { columns: 2; }
+}
+@media (max-width: 520px) {
+  .pf-gallery { columns: 1; padding: 0 16px; }
+  .pf-hero { min-height: 55vh; padding: 60px 16px 40px; }
+  .pf-hero-avatar { width: 80px; height: 80px; }
+}

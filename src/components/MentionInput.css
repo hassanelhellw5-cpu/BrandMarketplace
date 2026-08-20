@@ -1,0 +1,24 @@
+.mention-wrap { position: relative; width: 100%; }
+.mention-drop {
+  position: absolute; left: 0; right: 0; bottom: calc(100% + 6px);
+  background: var(--surface); border: 1px solid var(--border-strong);
+  border-radius: 14px; box-shadow: 0 12px 40px -8px rgba(0,0,0,0.55);
+  overflow: hidden; z-index: 60; max-height: 260px; overflow-y: auto;
+}
+.mention-opt {
+  display: flex; align-items: center; gap: 10px; width: 100%;
+  padding: 10px 14px; background: none; border: none; cursor: pointer;
+  color: var(--text); text-align: left; font-family: inherit;
+}
+.mention-opt:hover, .mention-opt.on { background: var(--bg-soft); }
+.mention-opt-ava {
+  width: 32px; height: 32px; border-radius: 50%; overflow: hidden; flex-shrink: 0;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  display: flex; align-items: center; justify-content: center;
+  color: #fff; font-size: 13px; font-weight: 700;
+}
+.mention-opt-ava img { width: 100%; height: 100%; object-fit: cover; }
+.mention-opt-name { font-weight: 600; font-size: 13.5px; white-space: nowrap; }
+.mention-opt-username { margin-left: auto; color: var(--text-faint); font-size: 12px; white-space: nowrap; }
+
+.mention-hl { color: #A78BFA; font-weight: 600; }

@@ -1,0 +1,15 @@
+.booking-row {
+  display: flex; align-items: center; gap: 14px;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--border);
+  transition: background 0.15s;
+}
+.booking-row:hover { background: var(--bg-soft); }
+.booking-row:last-child { border-bottom: none; }
+.booking-icon {
+  width: 40px; height: 40px; border-radius: 12px;
+  background: var(--grad-soft);
+  border: 1px solid rgba(139,92,246,0.3);
+  display: grid; place-items: center;
+  color: var(--primary-2); flex-shrink: 0;
+}

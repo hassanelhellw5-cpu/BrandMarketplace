@@ -1,0 +1,10 @@
+.detail-block { margin: 24px 0; }
+.detail-block h3 { font-size: 16px; margin-bottom: 8px; }
+.apply-success {
+  display: flex; align-items: center; gap: 12px;
+  background: rgba(16,185,129,0.1);
+  border: 1px solid rgba(16,185,129,0.35);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 18px;
+}

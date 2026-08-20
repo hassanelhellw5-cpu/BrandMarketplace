@@ -1,0 +1,16 @@
+.event-detail-cover { height: 220px; }
+.event-detail-cover img { width: 100%; height: 100%; object-fit: cover; }
+.event-detail-cover-fallback {
+  width: 100%; height: 100%;
+  display: grid; place-items: center;
+  font-family: var(--font-head); font-size: 64px; font-weight: 700;
+  background: linear-gradient(135deg, #4C1D95, #9D174D);
+  color: rgba(255,255,255,0.9);
+}
+.ticket-row {
+  display: flex; justify-content: space-between; align-items: center;
+  background: var(--bg-soft);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 14px 16px;
+}
