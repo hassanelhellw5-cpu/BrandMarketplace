@@ -71,15 +71,15 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
     peer.on('error', hangUp)
   }, [user?.id, hangUp])
 
-  const getMedia = useCallback(async () => {
+  const getMedia = useCallback(async (video) => {
     const stream = await navigator.mediaDevices.getUserMedia({
-      video: isVideo,
+      video,
       audio: true,
     })
     localStreamRef.current = stream
     if (localVideoRef.current) localVideoRef.current.srcObject = stream
     return stream
-  }, [isVideo])
+  }, [])
 
   // OUTGOING: caller creates peer and sends CallOffer
   useEffect(() => {
@@ -90,7 +90,7 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
 
     const start = async () => {
       try {
-        const stream = await getMedia()
+        const stream = await getMedia(call.isVideo)
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
 
         setupPeer(stream, (peer) => {
@@ -113,7 +113,7 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
 
     const start = async () => {
       try {
-        const stream = await getMedia()
+        const stream = await getMedia(call.isVideo)
 
         setupPeer(stream, (peer) => {
           hubConnection?.invoke('CallAnswer', call.callerId, peer.id).catch(() => {})
@@ -166,6 +166,13 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
   useEffect(() => {
     return () => cleanup()
   }, [cleanup])
+
+  // Set local video stream when video element mounts
+  useEffect(() => {
+    if (isVideo && localStreamRef.current && localVideoRef.current && !localVideoRef.current.srcObject) {
+      localVideoRef.current.srcObject = localStreamRef.current
+    }
+  }, [isVideo])
 
   const toggleMute = () => {
     if (localStreamRef.current) {

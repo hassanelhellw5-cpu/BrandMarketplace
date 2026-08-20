@@ -86,15 +86,82 @@ export default function Messages() {
     return () => { conn.stop().catch(() => {}) }
   }, [user?.id])
 
+  // SignalR connection for real-time messaging
+  const chatConnRef = useRef(null)
+  const activeRef = useRef(active)
+  useEffect(() => { activeRef.current = active }, [active])
+
+  useEffect(() => {
+    if (!user?.id) return
+    const chatConn = new signalR.HubConnectionBuilder()
+      .withUrl(`${API_BASE.replace('/api', '')}/hubs/chat`, {
+        accessTokenFactory: () => tokenStore.getAccess() || '',
+      })
+      .withAutomaticReconnect()
+      .configureLogging(signalR.LogLevel.Warning)
+      .build()
+
+    chatConn.on('ReceiveMessage', (msg) => {
+      const currentActive = activeRef.current
+      const otherUserId = msg.senderUserId === user.id ? msg.receiverUserId : msg.senderUserId
+      if (otherUserId === currentActive) {
+        setThread((prev) => {
+          const idx = prev.findIndex((m) => m.id === msg.id)
+          const real = {
+            id: msg.id,
+            senderUserId: msg.senderUserId,
+            receiverUserId: msg.receiverUserId,
+            content: msg.content,
+            createdAt: msg.createdAt,
+            isRead: false,
+          }
+          if (idx >= 0) {
+            const next = [...prev]
+            next[idx] = real
+            return next
+          }
+          if (prev.some((m) => m._pending && m.senderUserId === msg.senderUserId && m.content === '')) {
+            return prev.map((m) => m._pending && m.senderUserId === msg.senderUserId && m.content === '' ? real : m)
+          }
+          return [...prev, real]
+        })
+      }
+      loadConvs()
+    })
+
+    chatConn.on('MessageSent', (msg) => {
+      setThread((prev) => {
+        if (prev.some((m) => m.id === msg.id)) return prev
+        return [...prev, {
+          id: msg.id,
+          senderUserId: user.id,
+          content: '',
+          createdAt: msg.createdAt,
+          isRead: false,
+          _pending: true,
+        }]
+      })
+      loadConvs()
+    })
+
+    chatConnRef.current = chatConn
+    chatConn.start().catch(() => {})
+    return () => { chatConn.stop().catch(() => {}) }
+  }, [user?.id])
+
   const send = async (e) => {
     e.preventDefault()
     if (!text.trim() || !active) return
     const content = text.trim()
     setText('')
     try {
-      await post('/chat/send', { receiverUserId: active, content })
-      const res = await get('/chat/messages/' + active)
-      setThread(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
+      if (chatConnRef.current?.state === signalR.HubConnectionState.Connected) {
+        await chatConnRef.current.invoke('SendMessage', active, content)
+      } else {
+        await post('/chat/send', { receiverUserId: active, content })
+        const res = await get('/chat/messages/' + active)
+        setThread(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
+      }
       loadConvs()
       reportSendMessage(active, null)
     } catch (err) {
