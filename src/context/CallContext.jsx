@@ -31,7 +31,7 @@ export function CallProvider({ children }) {
 
     c.on('CallOffer', (data) => {
       if (String(data.callerId) === String(user.id)) return
-      if (incomingRef.current) {
+      if (incomingRef.current || activeCallRef.current) {
         c.invoke('CallReject', data.callerId).catch(() => {})
         return
       }
@@ -55,9 +55,12 @@ export function CallProvider({ children }) {
     c.start().then(() => {
       setConn(c)
       c.invoke('SendPresence', user.displayName || user.userName).catch(() => {})
-    }).catch(() => {})
+    }).catch((err) => console.warn('Meeting hub connection failed:', err))
     return () => { c.stop().catch(() => {}) }
   }, [user?.id])
+
+  const activeCallRef = useRef(null)
+  useEffect(() => { activeCallRef.current = activeCall }, [activeCall])
 
   const startCall = useCallback((peerUserId, peerName, isVideo) => {
     setActiveCall({

@@ -90,6 +90,8 @@ export default function Messages() {
   const chatConnRef = useRef(null)
   const activeRef = useRef(active)
   useEffect(() => { activeRef.current = active }, [active])
+  const threadRef = useRef(thread)
+  useEffect(() => { threadRef.current = thread }, [thread])
 
   useEffect(() => {
     if (!user?.id) return
@@ -106,46 +108,22 @@ export default function Messages() {
       const otherUserId = msg.senderUserId === user.id ? msg.receiverUserId : msg.senderUserId
       if (otherUserId === currentActive) {
         setThread((prev) => {
-          const idx = prev.findIndex((m) => m.id === msg.id)
-          const real = {
+          if (prev.some((m) => m.id === msg.id)) return prev
+          return [...prev, {
             id: msg.id,
             senderUserId: msg.senderUserId,
             receiverUserId: msg.receiverUserId,
             content: msg.content,
             createdAt: msg.createdAt,
             isRead: false,
-          }
-          if (idx >= 0) {
-            const next = [...prev]
-            next[idx] = real
-            return next
-          }
-          if (prev.some((m) => m._pending && m.senderUserId === msg.senderUserId && m.content === '')) {
-            return prev.map((m) => m._pending && m.senderUserId === msg.senderUserId && m.content === '' ? real : m)
-          }
-          return [...prev, real]
+          }]
         })
       }
       loadConvs()
     })
 
-    chatConn.on('MessageSent', (msg) => {
-      setThread((prev) => {
-        if (prev.some((m) => m.id === msg.id)) return prev
-        return [...prev, {
-          id: msg.id,
-          senderUserId: user.id,
-          content: '',
-          createdAt: msg.createdAt,
-          isRead: false,
-          _pending: true,
-        }]
-      })
-      loadConvs()
-    })
-
     chatConnRef.current = chatConn
-    chatConn.start().catch(() => {})
+    chatConn.start().catch((err) => console.warn('Chat hub connection failed:', err))
     return () => { chatConn.stop().catch(() => {}) }
   }, [user?.id])
 
@@ -154,18 +132,32 @@ export default function Messages() {
     if (!text.trim() || !active) return
     const content = text.trim()
     setText('')
+
+    const tempId = 'temp-' + Date.now()
+    const optimistic = {
+      id: tempId,
+      senderUserId: user.id,
+      receiverUserId: active,
+      content,
+      createdAt: new Date().toISOString(),
+      isRead: false,
+    }
+    setThread((prev) => [...prev, optimistic])
+    loadConvs()
+
     try {
       if (chatConnRef.current?.state === signalR.HubConnectionState.Connected) {
         await chatConnRef.current.invoke('SendMessage', active, content)
       } else {
         await post('/chat/send', { receiverUserId: active, content })
         const res = await get('/chat/messages/' + active)
-        setThread(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
+        const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+        setThread(msgs)
       }
-      loadConvs()
       reportSendMessage(active, null)
     } catch (err) {
       toast.error(errMsg(err))
+      setThread((prev) => prev.filter((m) => m.id !== tempId))
       setText(content)
     }
   }
