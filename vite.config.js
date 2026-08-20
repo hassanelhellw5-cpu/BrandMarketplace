@@ -7,12 +7,12 @@ export default defineConfig({
     port: 5173,
     proxy: {
       '/api': {
-        target: 'http://brandmarketplace.runasp.net',
+        target: 'http://localhost:5032',
         changeOrigin: true,
         secure: false,
       },
       '/hubs': {
-        target: 'ws://brandmarketplace.runasp.net',
+        target: 'ws://localhost:5032',
         ws: true,
         changeOrigin: true,
         secure: false,

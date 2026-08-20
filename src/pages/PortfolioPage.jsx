@@ -61,7 +61,7 @@ export default function PortfolioPage() {
   const getUserPhoto = () => {
     if (userProfile?.profilePictureUrl) {
       const url = userProfile.profilePictureUrl
-      return url.startsWith('http') ? url : `http://brandmarketplace.runasp.net${url.startsWith('/') ? url : '/' + url}`
+      return url.startsWith('http') ? url : `https://brandmarketplace.runasp.net${url.startsWith('/') ? url : '/' + url}`
     }
     return null
   }
