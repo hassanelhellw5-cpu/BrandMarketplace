@@ -52,8 +52,10 @@ export function CallProvider({ children }) {
       setIncomingCall(null)
     })
 
-    c.start().catch(() => {})
-    setConn(c)
+    c.start().then(() => {
+      setConn(c)
+      c.invoke('SendPresence', user.displayName || user.userName).catch(() => {})
+    }).catch(() => {})
     return () => { c.stop().catch(() => {}) }
   }, [user?.id])
 
@@ -99,7 +101,7 @@ export function CallProvider({ children }) {
           onReject={rejectCall}
         />
       )}
-      {activeCall && (
+      {activeCall && conn && (
         <CallPanel
           call={activeCall}
           onEnd={handleCallEnd}
