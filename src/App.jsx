@@ -3,6 +3,7 @@ import { useEffect } from 'react'
 import { AuthProvider, useAuth, setBanToast } from './context/AuthContext'
 import { NotificationProvider } from './context/NotificationContext'
 import { SubscriptionProvider } from './context/SubscriptionContext'
+import { CallProvider } from './context/CallContext'
 import { ToastProvider, useToast } from './components/Toast'
 import NotificationPopup from './components/NotificationPopup'
 import Navbar from './components/Navbar'
@@ -127,6 +128,7 @@ export default function App() {
         <ToastProvider>
         <BanListener />
         <NotificationProvider>
+        <CallProvider>
         <NotificationPopup />
         <Routes>
           <Route element={<PublicLayout />}>
@@ -194,6 +196,7 @@ export default function App() {
             <Route path="/admin" element={<Admin />} />
           </Route>
         </Routes>
+        </CallProvider>
         </NotificationProvider>
         </ToastProvider>
       </SubscriptionProvider>

@@ -5,9 +5,9 @@ import * as signalR from '@microsoft/signalr'
 import { get, post, errMsg, assetUrl, tokenStore } from '../api/client'
 import { API_BASE } from '../config'
 import { useAuth } from '../context/AuthContext'
+import { useCall } from '../context/CallContext'
 import { useToast } from '../components/Toast'
 import { PageLoader } from '../components/ui'
-import CallPanel from '../components/CallPanel'
 import { reportSendMessage, reportReportUser } from '../hooks/usePageTracking'
 import './Messages.css'
 
@@ -31,9 +31,7 @@ export default function Messages() {
   const [reportSubmitting, setReportSubmitting] = useState(false)
   const [blockConfirm, setBlockConfirm] = useState(false)
 
-  // Call state
-  const [call, setCall] = useState(null) // { direction, peerUserId, peerName, isVideo, callerId }
-  const [incomingCall, setIncomingCall] = useState(null) // pending incoming call info
+  const { startCall } = useCall()
 
   const endRef = useRef(null)
   const inputRef = useRef(null)
@@ -69,7 +67,7 @@ export default function Messages() {
     if (active) inputRef.current?.focus()
   }, [active])
 
-  // SignalR connection
+  // SignalR connection for online status
   useEffect(() => {
     if (!user?.id) return
     const conn = new signalR.HubConnectionBuilder()
@@ -83,47 +81,10 @@ export default function Messages() {
     conn.on('UserOnline', (d) => setOnlineUsers((p) => new Set([...p, d.userId])))
     conn.on('UserOffline', (d) => setOnlineUsers((p) => { const n = new Set(p); n.delete(d.userId); return n }))
 
-    // Incoming call
-    conn.on('CallOffer', (data) => {
-      if (String(data.callerId) === String(user.id)) return
-      setIncomingCall({
-        callerId: data.callerId,
-        peerId: data.peerId,
-        isVideo: data.isVideo,
-      })
-    })
-
-    // Call rejected by remote
-    conn.on('CallRejected', () => {
-      setCall(null)
-      toast.info('Call declined')
-    })
-
-    // Call ended by remote
-    conn.on('CallEnded', () => {
-      setCall(null)
-      setIncomingCall(null)
-    })
-
     connRef.current = conn
     conn.start().then(() => conn.invoke('SendPresence', user.displayName || user.userName).catch(() => {})).catch(() => {})
     return () => { conn.stop().catch(() => {}) }
   }, [user?.id])
-
-  // Resolve caller name for incoming call
-  useEffect(() => {
-    if (!incomingCall) return
-    const resolve = async () => {
-      try {
-        const res = await get('/profiles/by-user/' + incomingCall.callerId)
-        const name = res?.user?.displayName || res?.user?.userName || 'User'
-        setIncomingCall((c) => c ? { ...c, callerName: name } : c)
-      } catch {
-        setIncomingCall((c) => c ? { ...c, callerName: 'User' } : c)
-      }
-    }
-    resolve()
-  }, [incomingCall?.callerId])
 
   const send = async (e) => {
     e.preventDefault()
@@ -154,37 +115,9 @@ export default function Messages() {
     : convs
 
   // ---- Call actions ----
-  const startCall = (video) => {
+  const handleStartCall = (video) => {
     if (!active) return
-    setCall({
-      direction: 'outgoing',
-      peerUserId: active,
-      peerName: activeConv?.otherUserName || 'User',
-      isVideo: video,
-    })
-  }
-
-  const acceptIncomingCall = () => {
-    if (!incomingCall) return
-    setCall({
-      direction: 'incoming',
-      peerUserId: incomingCall.callerId,
-      peerName: incomingCall.callerName || 'User',
-      isVideo: incomingCall.isVideo,
-      callerId: incomingCall.callerId,
-      callerPeerId: incomingCall.peerId,
-    })
-    setIncomingCall(null)
-  }
-
-  const declineIncomingCall = () => {
-    if (!incomingCall || !connRef.current) return
-    connRef.current.invoke('CallReject', incomingCall.callerId).catch(() => {})
-    setIncomingCall(null)
-  }
-
-  const handleCallEnd = () => {
-    setCall(null)
+    startCall(active, activeConv?.otherUserName || 'User', video)
   }
 
   // ---- Report / Block ----
@@ -326,10 +259,10 @@ export default function Messages() {
                 </div>
 
                 {/* Call buttons — always visible */}
-                <button className="chat-call-btn" onClick={() => startCall(false)} title="Voice call" style={!onlineUsers.has(active) ? { opacity: 0.4 } : {}}>
+                <button className="chat-call-btn" onClick={() => handleStartCall(false)} title="Voice call" style={!onlineUsers.has(active) ? { opacity: 0.4 } : {}}>
                   <Phone size={18} />
                 </button>
-                <button className="chat-call-btn" onClick={() => startCall(true)} title="Video call" style={!onlineUsers.has(active) ? { opacity: 0.4 } : {}}>
+                <button className="chat-call-btn" onClick={() => handleStartCall(true)} title="Video call" style={!onlineUsers.has(active) ? { opacity: 0.4 } : {}}>
                   <Video size={18} />
                 </button>
 
@@ -402,38 +335,6 @@ export default function Messages() {
           )}
         </div>
       </div>
-
-      {/* Active call panel */}
-      {call && (
-        <CallPanel
-          call={call}
-          onEnd={handleCallEnd}
-          hubConnection={connRef.current}
-        />
-      )}
-
-      {/* Incoming call popup */}
-      {incomingCall && !call && (
-        <div className="call-incoming-popup">
-          <div className="call-incoming-card">
-            <div className="call-incoming-avatar">
-              {incomingCall.callerName?.[0] || 'U'}
-            </div>
-            <div className="call-incoming-info">
-              <div className="call-incoming-name">{incomingCall.callerName || 'User'}</div>
-              <div className="call-incoming-type">{incomingCall.isVideo ? 'Video call' : 'Voice call'}</div>
-            </div>
-            <div className="call-incoming-actions">
-              <button className="call-incoming-decline" onClick={declineIncomingCall} title="Decline">
-                <PhoneOff size={22} />
-              </button>
-              <button className="call-incoming-accept" onClick={acceptIncomingCall} title="Accept">
-                {incomingCall.isVideo ? <Video size={22} /> : <Phone size={22} />}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
 
       {/* Block confirm modal */}
       {blockConfirm && (

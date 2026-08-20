@@ -1,0 +1,102 @@
+.icp-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 600;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  animation: icpFadeIn 0.2s ease;
+}
+@keyframes icpFadeIn { from { opacity: 0; } to { opacity: 1; } }
+
+.icp-card {
+  background: #1a1625;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 24px;
+  padding: 40px 48px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+  animation: icpPop 0.3s ease;
+  position: relative;
+}
+@keyframes icpPop { from { transform: scale(0.9); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+.icp-pulse-ring {
+  position: absolute;
+  top: 20px;
+  width: 90px;
+  height: 90px;
+  border-radius: 50%;
+  border: 3px solid rgba(139, 92, 246, 0.5);
+  animation: icpPulseRing 1.5s ease-in-out infinite;
+}
+@keyframes icpPulseRing {
+  0%, 100% { transform: scale(1); opacity: 1; }
+  50% { transform: scale(1.3); opacity: 0; }
+}
+
+.icp-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B5CF6, #EC4899);
+  display: grid;
+  place-items: center;
+  color: #fff;
+  font-size: 30px;
+  font-weight: 800;
+  position: relative;
+  z-index: 1;
+}
+
+.icp-name {
+  color: #fff;
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.icp-type {
+  color: rgba(255, 255, 255, 0.55);
+  font-size: 14px;
+  font-weight: 500;
+}
+
+.icp-actions {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+  margin-top: 16px;
+}
+
+.icp-btn {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: none;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: #fff;
+  transition: all 0.18s;
+}
+
+.icp-decline {
+  background: #ef4444;
+}
+.icp-decline:hover { background: #dc2626; transform: scale(1.08); }
+
+.icp-accept {
+  background: #10b981;
+  animation: icpRingPulse 1.5s ease-in-out infinite;
+}
+.icp-accept:hover { background: #059669; transform: scale(1.08); }
+@keyframes icpRingPulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(16, 185, 129, 0.5); }
+  50% { box-shadow: 0 0 0 14px rgba(16, 185, 129, 0); }
+}

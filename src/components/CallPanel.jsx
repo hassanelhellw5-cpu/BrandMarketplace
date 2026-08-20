@@ -4,8 +4,6 @@ import Peer from 'peerjs'
 import { useAuth } from '../context/AuthContext'
 import './CallPanel.css'
 
-const SERVER_URL = 'https://brandmarketplace.runasp.net'
-
 export default function CallPanel({ call, onEnd, hubConnection }) {
   const { user } = useAuth()
   const [phase, setPhase] = useState(call.direction === 'outgoing' ? 'calling' : 'ringing')
@@ -61,7 +59,7 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
         localVideoRef.current.srcObject = stream
       }
 
-      const peer = new Peer(user.id, { url: SERVER_URL + '/peerjs' })
+      const peer = new Peer(user.id)
       peerRef.current = peer
 
       peer.on('open', () => {
@@ -103,11 +101,11 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
         localStreamRef.current = stream
         if (localVideoRef.current) localVideoRef.current.srcObject = stream
 
-        const peer = new Peer(user.id, { url: SERVER_URL + '/peerjs' })
+        const peer = new Peer(user.id)
         peerRef.current = peer
 
         peer.on('open', () => {
-          hubConnection?.invoke('CallOffer', call.peerUserId, peer.id, call.isVideo).catch(() => {})
+          hubConnection?.invoke('CallOffer', call.peerUserId, peer.id, call.isVideo, user.displayName || user.userName).catch(() => {})
         })
 
         peer.on('call', (conn) => {
