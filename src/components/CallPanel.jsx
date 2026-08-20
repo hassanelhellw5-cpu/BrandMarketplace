@@ -1,12 +1,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
-import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff, X } from 'lucide-react'
+import { Phone, PhoneOff, Video, VideoOff, Mic, MicOff } from 'lucide-react'
 import Peer from 'peerjs'
 import { useAuth } from '../context/AuthContext'
 import './CallPanel.css'
 
 export default function CallPanel({ call, onEnd, hubConnection }) {
   const { user } = useAuth()
-  const [phase, setPhase] = useState(call.direction === 'outgoing' ? 'calling' : 'ringing')
+  const [phase, setPhase] = useState(call.direction === 'outgoing' ? 'calling' : 'connecting')
   const [isVideo, setIsVideo] = useState(call.isVideo)
   const [muted, setMuted] = useState(false)
   const [videoOff, setVideoOff] = useState(false)
@@ -17,6 +17,7 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
   const localVideoRef = useRef(null)
   const remoteVideoRef = useRef(null)
   const timerRef = useRef(null)
+  const startedRef = useRef(false)
 
   const cleanup = useCallback(() => {
     if (timerRef.current) clearInterval(timerRef.current)
@@ -47,96 +48,89 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
     onEnd()
   }, [hubConnection, call.callerId, cleanup, onEnd])
 
-  const acceptIncoming = useCallback(async () => {
-    setPhase('connecting')
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({
-        video: call.isVideo,
-        audio: true,
+  const setupPeer = useCallback((stream, onPeerOpen) => {
+    const peer = new Peer(user.id)
+    peerRef.current = peer
+
+    peer.on('open', () => {
+      onPeerOpen(peer)
+    })
+
+    peer.on('call', (conn) => {
+      conn.answer(stream)
+      conn.on('stream', (remote) => {
+        remoteStreamRef.current = remote
+        if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote
+        setPhase('connected')
+        timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000)
       })
-      localStreamRef.current = stream
-      if (localVideoRef.current) {
-        localVideoRef.current.srcObject = stream
-      }
+      conn.on('close', hangUp)
+      conn.on('error', hangUp)
+    })
 
-      const peer = new Peer(user.id)
-      peerRef.current = peer
+    peer.on('error', hangUp)
+  }, [user?.id, hangUp])
 
-      peer.on('open', () => {
-        hubConnection?.invoke('CallAnswer', call.callerId, peer.id).catch(() => {})
-      })
+  const getMedia = useCallback(async () => {
+    const stream = await navigator.mediaDevices.getUserMedia({
+      video: isVideo,
+      audio: true,
+    })
+    localStreamRef.current = stream
+    if (localVideoRef.current) localVideoRef.current.srcObject = stream
+    return stream
+  }, [isVideo])
 
-      peer.on('call', (conn) => {
-        conn.answer(stream)
-        conn.on('stream', (remote) => {
-          remoteStreamRef.current = remote
-          if (remoteVideoRef.current) {
-            remoteVideoRef.current.srcObject = remote
-          }
-          setPhase('connected')
-          timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000)
-        })
-        conn.on('close', hangUp)
-        conn.on('error', hangUp)
-      })
-
-      peer.on('error', hangUp)
-    } catch {
-      hangUp()
-    }
-  }, [call, user?.id, hubConnection, hangUp])
-
-  // Outgoing call flow
+  // OUTGOING: caller creates peer and sends CallOffer
   useEffect(() => {
     if (call.direction !== 'outgoing') return
+    if (startedRef.current) return
+    startedRef.current = true
     let cancelled = false
 
-    const startOutgoing = async () => {
+    const start = async () => {
       try {
-        const stream = await navigator.mediaDevices.getUserMedia({
-          video: call.isVideo,
-          audio: true,
-        })
+        const stream = await getMedia()
         if (cancelled) { stream.getTracks().forEach((t) => t.stop()); return }
-        localStreamRef.current = stream
-        if (localVideoRef.current) localVideoRef.current.srcObject = stream
 
-        const peer = new Peer(user.id)
-        peerRef.current = peer
-
-        peer.on('open', () => {
+        setupPeer(stream, (peer) => {
           hubConnection?.invoke('CallOffer', call.peerUserId, peer.id, call.isVideo, user.displayName || user.userName).catch(() => {})
         })
-
-        peer.on('call', (conn) => {
-          conn.answer(stream)
-          conn.on('stream', (remote) => {
-            if (cancelled) return
-            remoteStreamRef.current = remote
-            if (remoteVideoRef.current) remoteVideoRef.current.srcObject = remote
-            setPhase('connected')
-            timerRef.current = setInterval(() => setElapsed((s) => s + 1), 1000)
-          })
-          conn.on('close', hangUp)
-          conn.on('error', hangUp)
-        })
-
-        peer.on('error', hangUp)
       } catch {
         hangUp()
       }
     }
 
-    startOutgoing()
+    start()
     return () => { cancelled = true }
   }, [call.direction === 'outgoing'])
 
-  // Listen for call events from SignalR
+  // INCOMING: auto-accept — user already accepted in popup
+  useEffect(() => {
+    if (call.direction !== 'incoming') return
+    if (startedRef.current) return
+    startedRef.current = true
+
+    const start = async () => {
+      try {
+        const stream = await getMedia()
+
+        setupPeer(stream, (peer) => {
+          hubConnection?.invoke('CallAnswer', call.callerId, peer.id).catch(() => {})
+        })
+      } catch {
+        rejectIncoming()
+      }
+    }
+
+    start()
+  }, [call.direction === 'incoming'])
+
+  // Listen for CallAnswer from SignalR (outgoing flow: callee answered)
   useEffect(() => {
     if (!hubConnection) return
 
     const handleAnswer = async (data) => {
-      if (phase !== 'calling' && phase !== 'connecting') return
       if (!peerRef.current) return
       try {
         const stream = localStreamRef.current
@@ -167,7 +161,7 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
       hubConnection.off('CallRejected', handleRejected)
       hubConnection.off('CallEnded', handleEnded)
     }
-  }, [hubConnection, phase, hangUp, cleanup, onEnd])
+  }, [hubConnection, hangUp, cleanup, onEnd])
 
   useEffect(() => {
     return () => cleanup()
@@ -192,24 +186,16 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
   return (
     <div className="call-overlay">
       <div className="call-panel">
-        {/* Remote video (full background) */}
         {isVideo && (
-          <video
-            ref={remoteVideoRef}
-            className="call-remote-video"
-            autoPlay
-            playsInline
-          />
+          <video ref={remoteVideoRef} className="call-remote-video" autoPlay playsInline />
         )}
 
-        {/* Local video (pip) */}
         {isVideo && (
           <div className="call-pip">
-            <video ref={localVideoRef} autoPlay playsInline muted muted={true} />
+            <video ref={localVideoRef} autoPlay playsInline muted={true} />
           </div>
         )}
 
-        {/* Audio-only: show avatar */}
         {!isVideo && (
           <div className="call-avatar-area">
             <div className="call-avatar">
@@ -218,18 +204,15 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
           </div>
         )}
 
-        {/* Info overlay */}
         <div className="call-info">
           <div className="call-name">{call.peerName || 'User'}</div>
           <div className="call-status">
             {phase === 'calling' && 'Calling…'}
-            {phase === 'ringing' && 'Incoming call…'}
             {phase === 'connecting' && 'Connecting…'}
             {phase === 'connected' && fmt(elapsed)}
           </div>
         </div>
 
-        {/* Controls */}
         <div className="call-controls">
           {phase === 'connected' && (
             <>
@@ -244,20 +227,9 @@ export default function CallPanel({ call, onEnd, hubConnection }) {
             </>
           )}
 
-          {phase === 'ringing' && call.direction === 'incoming' ? (
-            <>
-              <button className="call-ctrl call-decline" onClick={rejectIncoming} title="Decline">
-                <PhoneOff size={22} />
-              </button>
-              <button className="call-ctrl call-accept" onClick={acceptIncoming} title="Accept">
-                <Phone size={22} />
-              </button>
-            </>
-          ) : (
-            <button className="call-ctrl call-decline" onClick={hangUp} title="End call">
-              <PhoneOff size={22} />
-            </button>
-          )}
+          <button className="call-ctrl call-decline" onClick={call.direction === 'incoming' ? rejectIncoming : hangUp} title="End call">
+            <PhoneOff size={22} />
+          </button>
         </div>
       </div>
     </div>
