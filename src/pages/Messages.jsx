@@ -156,9 +156,18 @@ export default function Messages() {
       }
       reportSendMessage(active, null)
     } catch (err) {
-      toast.error(errMsg(err))
-      setThread((prev) => prev.filter((m) => m.id !== tempId))
-      setText(content)
+      console.warn('Hub send failed, falling back to REST:', err)
+      try {
+        await post('/chat/send', { receiverUserId: active, content })
+        const res = await get('/chat/messages/' + active)
+        const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+        setThread(msgs)
+        reportSendMessage(active, null)
+      } catch (restErr) {
+        toast.error(errMsg(restErr))
+        setThread((prev) => prev.filter((m) => m.id !== tempId))
+        setText(content)
+      }
     }
   }
 
