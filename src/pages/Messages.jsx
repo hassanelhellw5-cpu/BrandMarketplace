@@ -1,9 +1,9 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useSearchParams, Link, useNavigate } from 'react-router-dom'
-import { Send, Search, ArrowLeft, MoreVertical, CheckCheck, Check, Phone, PhoneOff, Video, User, ShieldAlert, EyeOff, X, Volume2 } from 'lucide-react'
+import { Send, Search, ArrowLeft, MoreVertical, CheckCheck, Check, Phone, Video, User, ShieldAlert, X, Volume2 } from 'lucide-react'
 import * as signalR from '@microsoft/signalr'
 import { get, post, errMsg, assetUrl, tokenStore } from '../api/client'
-import { API_BASE } from '../config'
+import { API_BASE, API_ORIGIN } from '../config'
 import { useAuth } from '../context/AuthContext'
 import { useCall } from '../context/CallContext'
 import { useToast } from '../components/Toast'
@@ -35,8 +35,13 @@ export default function Messages() {
 
   const endRef = useRef(null)
   const inputRef = useRef(null)
-  const connRef = useRef(null)
   const menuRef = useRef(null)
+  const activeRef = useRef(active)
+  const threadRef = useRef(thread)
+  const lastMsgTimeRef = useRef(null)
+
+  useEffect(() => { activeRef.current = active }, [active])
+  useEffect(() => { threadRef.current = thread }, [thread])
 
   const loadConvs = useCallback(async () => {
     try {
@@ -53,7 +58,11 @@ export default function Messages() {
     if (!active) return
     try {
       const res = await get('/chat/messages/' + active)
-      setThread(Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : [])
+      const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
+      setThread(msgs)
+      if (msgs.length > 0) {
+        lastMsgTimeRef.current = msgs[msgs.length - 1].createdAt
+      }
     } catch { setThread([]) }
   }, [active])
 
@@ -67,37 +76,37 @@ export default function Messages() {
     if (active) inputRef.current?.focus()
   }, [active])
 
-  // SignalR connection for online status
+  // SignalR for online status + real-time messages
   useEffect(() => {
     if (!user?.id) return
-    const conn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE.replace('/api', '')}/hubs/meeting`, {
+
+    const hubUrl = API_ORIGIN
+      ? `${API_ORIGIN}/hubs/chat`.replace('https://', 'wss://').replace('http://', 'ws://')
+      : `${window.location.protocol}//${window.location.host}/hubs/chat`
+
+    const meetingUrl = API_ORIGIN
+      ? `${API_ORIGIN}/hubs/meeting`.replace('https://', 'wss://').replace('http://', 'ws://')
+      : `${window.location.protocol}//${window.location.host}/hubs/meeting`
+
+    // Meeting hub for online status
+    const meetingConn = new signalR.HubConnectionBuilder()
+      .withUrl(meetingUrl, {
         accessTokenFactory: () => tokenStore.getAccess() || '',
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling,
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
       .build()
 
-    conn.on('UserOnline', (d) => setOnlineUsers((p) => new Set([...p, d.userId])))
-    conn.on('UserOffline', (d) => setOnlineUsers((p) => { const n = new Set(p); n.delete(d.userId); return n }))
+    meetingConn.on('UserOnline', (d) => setOnlineUsers((p) => new Set([...p, d.userId])))
+    meetingConn.on('UserOffline', (d) => setOnlineUsers((p) => { const n = new Set(p); n.delete(d.userId); return n }))
+    meetingConn.start().then(() => meetingConn.invoke('SendPresence', user.displayName || user.userName).catch(() => {})).catch(() => {})
 
-    connRef.current = conn
-    conn.start().then(() => conn.invoke('SendPresence', user.displayName || user.userName).catch(() => {})).catch(() => {})
-    return () => { conn.stop().catch(() => {}) }
-  }, [user?.id])
-
-  // SignalR connection for real-time messaging
-  const chatConnRef = useRef(null)
-  const activeRef = useRef(active)
-  useEffect(() => { activeRef.current = active }, [active])
-  const threadRef = useRef(thread)
-  useEffect(() => { threadRef.current = thread }, [thread])
-
-  useEffect(() => {
-    if (!user?.id) return
+    // Chat hub for real-time messages
     const chatConn = new signalR.HubConnectionBuilder()
-      .withUrl(`${API_BASE.replace('/api', '')}/hubs/chat`, {
+      .withUrl(hubUrl, {
         accessTokenFactory: () => tokenStore.getAccess() || '',
+        transport: signalR.HttpTransportType.WebSockets | signalR.HttpTransportType.ServerSentEvents | signalR.HttpTransportType.LongPolling,
       })
       .withAutomaticReconnect()
       .configureLogging(signalR.LogLevel.Warning)
@@ -105,27 +114,41 @@ export default function Messages() {
 
     chatConn.on('ReceiveMessage', (msg) => {
       const currentActive = activeRef.current
-      const otherUserId = msg.senderUserId === user.id ? msg.receiverUserId : msg.senderUserId
+      const senderId = msg.senderUserId || msg.senderId
+      const otherUserId = senderId === user.id ? (msg.receiverUserId || msg.receiverId) : senderId
       if (otherUserId === currentActive) {
         setThread((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev
           return [...prev, {
             id: msg.id,
-            senderUserId: msg.senderUserId,
-            receiverUserId: msg.receiverUserId,
+            senderUserId: senderId,
+            receiverUserId: msg.receiverUserId || msg.receiverId,
             content: msg.content,
             createdAt: msg.createdAt,
             isRead: false,
           }]
         })
+        endRef.current?.scrollIntoView({ behavior: 'smooth' })
       }
       loadConvs()
     })
 
-    chatConnRef.current = chatConn
-    chatConn.start().catch((err) => console.warn('Chat hub connection failed:', err))
-    return () => { chatConn.stop().catch(() => {}) }
+    chatConn.start().catch(() => {})
+
+    return () => {
+      meetingConn.stop().catch(() => {})
+      chatConn.stop().catch(() => {})
+    }
   }, [user?.id])
+
+  // Polling fallback: refresh thread every 4s when chat is open
+  useEffect(() => {
+    if (!active) return
+    const poll = setInterval(() => {
+      loadThread()
+    }, 4000)
+    return () => clearInterval(poll)
+  }, [active, loadThread])
 
   const send = async (e) => {
     e.preventDefault()
@@ -143,31 +166,24 @@ export default function Messages() {
       isRead: false,
     }
     setThread((prev) => [...prev, optimistic])
+    endRef.current?.scrollIntoView({ behavior: 'smooth' })
     loadConvs()
 
     try {
-      if (chatConnRef.current?.state === signalR.HubConnectionState.Connected) {
-        await chatConnRef.current.invoke('SendMessage', active, content)
-      } else {
-        await post('/chat/send', { receiverUserId: active, content })
-        const res = await get('/chat/messages/' + active)
-        const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
-        setThread(msgs)
-      }
+      const saved = await post('/chat/send', { receiverUserId: active, content })
+      setThread((prev) => prev.map((m) => m.id === tempId ? {
+        id: saved.id || tempId,
+        senderUserId: user.id,
+        receiverUserId: active,
+        content,
+        createdAt: saved.createdAt || optimistic.createdAt,
+        isRead: false,
+      } : m))
       reportSendMessage(active, null)
     } catch (err) {
-      console.warn('Hub send failed, falling back to REST:', err)
-      try {
-        await post('/chat/send', { receiverUserId: active, content })
-        const res = await get('/chat/messages/' + active)
-        const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
-        setThread(msgs)
-        reportSendMessage(active, null)
-      } catch (restErr) {
-        toast.error(errMsg(restErr))
-        setThread((prev) => prev.filter((m) => m.id !== tempId))
-        setText(content)
-      }
+      toast.error(errMsg(err))
+      setThread((prev) => prev.filter((m) => m.id !== tempId))
+      setText(content)
     }
   }
 
@@ -326,7 +342,6 @@ export default function Messages() {
                   </div>
                 </div>
 
-                {/* Call buttons — always visible */}
                 <button className="chat-call-btn" onClick={() => handleStartCall(false)} title="Voice call" style={!onlineUsers.has(active) ? { opacity: 0.4 } : {}}>
                   <Phone size={18} />
                 </button>
@@ -334,7 +349,6 @@ export default function Messages() {
                   <Video size={18} />
                 </button>
 
-                {/* Three-dot menu */}
                 <div className="chat-menu-wrap" ref={menuRef}>
                   <button className="chat-call-btn" onClick={() => setMenuOpen((v) => !v)} title="More options">
                     <MoreVertical size={18} />
@@ -361,7 +375,7 @@ export default function Messages() {
 
               {/* Messages */}
               <div className="msg-list">
-                {thread.length === 0 && <div className="conv-empty">Say hello! 👋</div>}
+                {thread.length === 0 && <div className="conv-empty">Say hello!</div>}
                 {thread.map((m, i) => {
                   const mine = m.senderUserId === user?.id
                   const prev = thread[i - 1]
