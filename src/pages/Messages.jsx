@@ -39,6 +39,7 @@ export default function Messages() {
   const activeRef = useRef(active)
   const threadRef = useRef(thread)
   const lastMsgTimeRef = useRef(null)
+  const chatConnRef = useRef(null)
 
   useEffect(() => { activeRef.current = active }, [active])
   useEffect(() => { threadRef.current = thread }, [thread])
@@ -59,11 +60,17 @@ export default function Messages() {
     try {
       const res = await get('/chat/messages/' + active)
       const msgs = Array.isArray(res?.data) ? res.data : Array.isArray(res) ? res : []
-      setThread(msgs)
+      setThread((prev) => {
+        const pending = prev.filter((m) => String(m.id).startsWith('temp-'))
+        if (pending.length === 0) return msgs
+        const serverContents = new Set(msgs.map((m) => `${m.senderUserId}|${m.content}`))
+        const unreplaced = pending.filter((m) => !serverContents.has(`${m.senderUserId}|${m.content}`))
+        return [...msgs, ...unreplaced]
+      })
       if (msgs.length > 0) {
         lastMsgTimeRef.current = msgs[msgs.length - 1].createdAt
       }
-    } catch { setThread([]) }
+    } catch { /* keep existing thread on network error */ }
   }, [active])
 
   useEffect(() => { loadThread() }, [loadThread])
@@ -119,6 +126,21 @@ export default function Messages() {
       if (otherUserId === currentActive) {
         setThread((prev) => {
           if (prev.some((m) => m.id === msg.id)) return prev
+          const optimisticIdx = prev.findIndex(
+            (m) => String(m.id).startsWith('temp-') && m.senderUserId === senderId && m.content === msg.content
+          )
+          if (optimisticIdx >= 0) {
+            const updated = [...prev]
+            updated[optimisticIdx] = {
+              id: msg.id,
+              senderUserId: senderId,
+              receiverUserId: msg.receiverUserId || msg.receiverId,
+              content: msg.content,
+              createdAt: msg.createdAt,
+              isRead: false,
+            }
+            return updated
+          }
           return [...prev, {
             id: msg.id,
             senderUserId: senderId,
@@ -133,11 +155,12 @@ export default function Messages() {
       loadConvs()
     })
 
-    chatConn.start().catch(() => {})
+    chatConn.start().then(() => { chatConnRef.current = chatConn }).catch(() => {})
 
     return () => {
       meetingConn.stop().catch(() => {})
       chatConn.stop().catch(() => {})
+      chatConnRef.current = null
     }
   }, [user?.id])
 
@@ -170,15 +193,12 @@ export default function Messages() {
     loadConvs()
 
     try {
-      const saved = await post('/chat/send', { receiverUserId: active, content })
-      setThread((prev) => prev.map((m) => m.id === tempId ? {
-        id: saved.id || tempId,
-        senderUserId: user.id,
-        receiverUserId: active,
-        content,
-        createdAt: saved.createdAt || optimistic.createdAt,
-        isRead: false,
-      } : m))
+      const conn = chatConnRef.current
+      if (conn && conn.state === signalR.HubConnectionState.Connected) {
+        await conn.invoke('SendMessage', active, content)
+      } else {
+        await post('/chat/send', { receiverUserId: active, content })
+      }
       reportSendMessage(active, null)
     } catch (err) {
       toast.error(errMsg(err))
